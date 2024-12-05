@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, DollarSign, Calculator, Info } from 'lucide-react';
-
-declare const Stripe: any;
-
-const stripe = Stripe('pk_test_51PECm7I38Ba0SBvH8MDMi6GjUJoVklJgilsuRMnEDAi9at26QelrjNnQJU46TUH9qUTzcZTE8eAsRgylCuZRQtn900aAlx25tp');
+import { storage } from "@/firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const dropTypes = [
   'Exclusive Event Page',
@@ -14,74 +12,86 @@ const dropTypes = [
   'Festival Ticket Access'
 ];
 
-interface MinySliderProps {
-  selectedDropType: string;
-}
+const validCoupons = ['COOL10', 'SUPER25', 'BIG50', 'MEGA70', 'ULTIMATE80'];
 
-export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
+export const MinySlider: React.FC = () => {
   const [quantity, setQuantity] = useState(20);
   const [designFee, setDesignFee] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>("Not Provided");
   const [loading, setLoading] = useState(false);
-  const [dropType, setDropType] = useState(selectedDropType);
+  const [selectedDropType, setSelectedDropType] = useState('');
+  const [couponCode, setCouponCode] = useState<string>('');
+  const [couponError, setCouponError] = useState<string>('');
 
-  // Update dropType when selectedDropType changes
-  React.useEffect(() => {
-    if (selectedDropType) {
-      setDropType(selectedDropType);
-    }
-  }, [selectedDropType]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const uploadedFile = e.target.files[0];
+      setFile(uploadedFile);
+
+      try {
+        const storageRef = ref(storage, `miny-designs/${uploadedFile.name}`);
+        await uploadBytes(storageRef, uploadedFile);
+        const downloadURL = await getDownloadURL(storageRef);
+        setImageUrl(downloadURL);
+      } catch (error) {
+        console.error("Error uploading image:", error);
+      }
     }
   };
 
   const totalCost = (quantity * 4.99) + (designFee ? 1000 : 0);
 
   const handlePayment = async () => {
-    if (!dropType) {
+    if (!selectedDropType) {
       alert('Please select a MINY drop type');
       return;
     }
+    if (designFee && !file) {
+      alert('Please upload a MINY design');
+      return;
+    }
+
+    // Validate coupon code
+    if (couponCode && !validCoupons.includes(couponCode)) {
+      setCouponError('Invalid coupon code');
+      return;
+    }
+
+    const validQuantity = Number(quantity);
+    if (isNaN(validQuantity) || validQuantity < 20 || validQuantity > 1000) {
+      alert('Please enter a valid quantity between 20 and 1000');
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      setLoading(true);
-      
-      const response = await fetch('/api/create-payment-intent', {
+      const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: Math.round(totalCost * 100),
-          quantity,
-          designFee,
-          dropType
+          origin: window.location.origin,
+          dropType: selectedDropType,
+          DesignUrl: imageUrl,
+          DesignFee: designFee,
+          quantity: validQuantity,
+          couponCode: couponCode, // Send the coupon code to the API
         }),
       });
 
-      const { clientSecret } = await response.json();
+      const data = await response.json();
 
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: await stripe.elements().create('card'),
-          billing_details: {
-            name: 'MINY Customer',
-          },
-        },
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Error creating checkout session: ' + data.error);
       }
-
-      alert('Payment successful! Your MINY drop will be processed.');
-      
     } catch (error) {
-      console.error('Payment failed:', error);
-      alert('Payment failed. Please try again.');
+      console.error('Error:', error);
+      alert('There was an error with the payment process. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -101,19 +111,20 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
 
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-indigo-100">
           <div className="space-y-8">
+            {/* Dropdown for selecting MINY drop type */}
             <div className="group relative">
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 Select MINY Drop Type
                 <div className="relative ml-2">
                   <Info className="h-4 w-4 text-gray-400" />
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                    Choose the type of experience you want to create for your fans
+                    Choose the type of experience you want to create for your super fans
                   </div>
                 </div>
               </label>
               <select
-                value={dropType}
-                onChange={(e) => setDropType(e.target.value)}
+                value={selectedDropType}
+                onChange={(e) => setSelectedDropType(e.target.value)}
                 className="mt-1 block w-full rounded-xl border-2 border-indigo-100 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-3"
                 required
               >
@@ -122,43 +133,6 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-            </div>
-
-            <div className="group relative">
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                Upload MINY Design
-                <div className="relative ml-2">
-                  <Info className="h-4 w-4 text-gray-400" />
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                    PNG or PDF format, 2" hexagon shape required
-                  </div>
-                </div>
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-indigo-100 border-dashed rounded-xl hover:border-indigo-500 transition-colors">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-indigo-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500">
-                      <span>Upload a file</span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        accept=".png,.pdf"
-                        onChange={handleFileChange}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG or PDF up to 10MB</p>
-                </div>
-              </div>
-              {file && (
-                <p className="mt-2 text-sm text-indigo-600">
-                  Selected file: {file.name}
-                </p>
-              )}
             </div>
 
             <div className="group relative">
@@ -179,6 +153,47 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
               </label>
             </div>
 
+            {/* File upload section for the design fee */}
+            {designFee && (
+              <div className="group relative">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                  Upload MINY Design
+                  <div className="relative ml-2">
+                    <Info className="h-4 w-4 text-gray-400" />
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                      PNG or PDF format, 2" hexagon shape required
+                    </div>
+                  </div>
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-indigo-100 border-dashed rounded-xl hover:border-indigo-500 transition-colors">
+                  <div className="space-y-1 text-center">
+                    <Upload className="mx-auto h-12 w-12 text-indigo-400" />
+                    <div className="flex text-sm text-gray-600">
+                      <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500">
+                        <span>Upload a file</span>
+                        <input
+                          id="file-upload"
+                          name="file-upload"
+                          type="file"
+                          className="sr-only"
+                          accept=".png,.pdf"
+                          onChange={handleFileChange}
+                        />
+                      </label>
+                      <p className="pl-1">or drag and drop</p>
+                    </div>
+                    <p className="text-xs text-gray-500">PNG or PDF up to 10MB</p>
+                  </div>
+                </div>
+                {file && (
+                  <p className="mt-2 text-sm text-indigo-600">
+                    Selected file: {file.name}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Quantity and total cost */}
             <div className="group relative">
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 Quantity (20-1,000)
@@ -195,7 +210,7 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
                   min="20"
                   max="1000"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
                   className="flex-1 h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer"
                 />
                 <input
@@ -203,12 +218,13 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
                   min="20"
                   max="1000"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
                   className="w-24 px-3 py-2 border-2 border-indigo-100 rounded-xl focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
 
+            {/* Display total investment cost */}
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-100">
               <div className="flex justify-between items-center text-lg font-semibold">
                 <span className="flex items-center">
@@ -237,11 +253,28 @@ export const MinySlider: React.FC<MinySliderProps> = ({ selectedDropType }) => {
               </div>
             </div>
 
+            <div className="group relative">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                Coupon Code (Optional)
+              </label>
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => {
+                  setCouponCode(e.target.value);
+                  setCouponError(''); // Reset coupon error on input change
+                }}
+                className="mt-1 block w-full rounded-xl border-2 border-indigo-100 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-3"
+                placeholder="Enter coupon code"
+              />
+              {couponError && <p className="text-red-500 text-sm">{couponError}</p>}
+            </div>
+
             <button 
               onClick={handlePayment}
-              disabled={loading || !file || !dropType}
+              disabled={loading || (designFee && !file) || !selectedDropType}
               className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all transform hover:scale-[1.02] ${
-                loading || !file || !dropType
+                loading || (designFee && !file) || !selectedDropType
                   ? 'bg-gray-300 cursor-not-allowed'
                   : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg'
               }`}

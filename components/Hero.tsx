@@ -17,7 +17,7 @@ export const Hero: React.FC = () => {
             </span>
           </h1>
           <p className="mt-6 text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
-            Craft meaningful experiences, reach superfans, and bring your artistry to life with MINY drops.
+            Craft meaningful experiences, reach super-fans, and bring your artistry to life with MINY Drops.
           </p>
           <div className="mt-10">
             <button 

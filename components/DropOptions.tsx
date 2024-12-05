@@ -1,10 +1,6 @@
 import React from 'react';
 import { Calendar, Music, ShoppingBag, Heart, Video, Ticket } from 'lucide-react';
 
-interface DropOptionsProps {
-  onDropSelect: (dropType: string) => void;
-}
-
 const drops = [
   {
     title: 'Exclusive Event Page',
@@ -25,7 +21,7 @@ const drops = [
     icon: ShoppingBag,
     description: 'Offer exclusive merchandise with special pricing for MINY holders.',
     features: ['360° product views', 'Exclusive pricing', 'Design voting', 'Community showcase'],
-    image: 'https://images.unsplash.com/photo-1515806265449-1a5448e892b4?auto=format&fit=crop&q=80&w=800'
+    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800'
   },
   {
     title: 'Music Cause Fundraiser',
@@ -50,10 +46,9 @@ const drops = [
   }
 ];
 
-export const DropOptions: React.FC<DropOptionsProps> = ({ onDropSelect }) => {
-  const handleDropSelect = (dropTitle: string) => {
-    onDropSelect(dropTitle);
-    document.querySelector('#miny-slider')?.scrollIntoView({ behavior: 'smooth' });
+export const DropOptions: React.FC = () => {
+  const scrollToShowcase = () => {
+    document.querySelector('#visual-showcase')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -86,10 +81,10 @@ export const DropOptions: React.FC<DropOptionsProps> = ({ onDropSelect }) => {
                   ))}
                 </ul>
                 <button 
-                  onClick={() => handleDropSelect(drop.title)}
+                  onClick={scrollToShowcase}
                   className="mt-6 w-full py-3 px-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white font-semibold transition"
                 >
-                  Create Drop
+                  Learn More
                 </button>
               </div>
             </div>
