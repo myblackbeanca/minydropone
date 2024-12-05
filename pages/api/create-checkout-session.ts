@@ -115,7 +115,7 @@ export default async function POST(request: Request): Promise<Response> {
         },
       ],
       mode: 'payment',
-      success_url: `${origin}/success?status=success`,
+      success_url: `${origin}/success?status=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: origin,
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'JP'],
