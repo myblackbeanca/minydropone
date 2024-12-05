@@ -163,7 +163,7 @@ export default function Success() {
           </div>
         )}
         <p className='text-gray-600 text-xl max-w-md'>
-          Thank you for your order. Your MINY purchase has been confirmed. We will update you shortly.
+          Thank you for your order. Your MINY purchase has been confirmed. A confirmation email has been sent to you. We will update you shortly.
         </p>
         <button
           onClick={() => window.location.href = '/'}
