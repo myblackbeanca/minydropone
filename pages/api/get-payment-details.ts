@@ -14,7 +14,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  const url = new URL(req.url);
+  // Ensure req.url is defined
+  if (!req.url) {
+    return new Response(JSON.stringify({ error: 'Invalid request URL' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const url = new URL(req.url, `http://${req.headers.host}`); // Provide a base URL
   const checkout_session_id = url.searchParams.get('checkout_session_id');
 
   if (!checkout_session_id) {
